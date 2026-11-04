@@ -46,7 +46,15 @@ Número que identifica la "caja" o punto de emisión dentro de ARCA para un mism
 
 ### Concepto
 
-Qué se está facturando: `productos`, `servicios` o `productos-servicios`. Determina si hace falta informar fechas de servicio (`--dia`, `--servicio-desde`, `--servicio-hasta`).
+Qué se está facturando: `productos`, `servicios` o `productos-servicios`. Determina si hace falta informar fechas de servicio (`--servicio-desde`, `--servicio-hasta`, `--vencimiento`).
+
+### Período del servicio, vencimiento y período asociado
+
+- **Período del servicio** (`--servicio-desde`/`--servicio-hasta`, `FchServDesde`/`FchServHasta`): qué período cubre una factura de servicios. Por ejemplo, el abono de octubre.
+- **Vencimiento** (`--vencimiento`/`--vto`, `FchVtoPago`): hasta cuándo se puede pagar. `--dia` está deprecado.
+- **Período asociado** (`--periodo-desde`/`--periodo-hasta`, `PeriodoAsoc`): solo en notas. Qué facturas ajusta la nota cuando no es una puntual, por ejemplo un descuento sobre todo lo facturado en octubre.
+
+Ejemplos en [Las fechas de un comprobante](cli-reference.md#las-fechas-de-un-comprobante).
 
 ### Comprobante asociado / `CbtesAsoc`
 

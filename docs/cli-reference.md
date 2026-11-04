@@ -216,7 +216,7 @@ En casi todos los casos te va a interesar mirar primero:
 | `--exento <numero>`            | ninguno         | `number`                                              | `0`                                      | Parte exenta del monto (solo `A` y `B`)          |
 | `--nogravado <numero>`         | ninguno         | `number`                                              | `0`                                      | Parte no gravada del monto (solo `A` y `B`)      |
 | `--fecha <fecha>`              | `-f`            | `string`                                              | hoy                                      | Fecha del comprobante                            |
-| `--dia <numero>`               | `-d`            | `integer`                                             | ninguno                                  | Día de vencimiento o referencia del servicio     |
+| `--dia <numero>`               | `-d`            | `integer`                                             | ninguno                                  | Deprecado: usá `--vencimiento` o `--vto`         |
 | `--punto-venta <numero>`       | `--pv`          | `integer`                                             | `config.puntoVenta`                      | Punto de venta                                   |
 | `--concepto <tipo>`            | `-c`            | `'productos' \| 'servicios' \| 'productos-servicios'` | `config.concepto`                        | `productos`, `servicios` o `productos-servicios` |
 | `--cs`                         | ninguno         | `boolean`                                             | `false`                                  | Equivale a `--concepto servicios`                |
@@ -242,7 +242,33 @@ En pesos la cotización siempre es `1` y `--misma-moneda` no aplica. Detalle en 
 
 Los montos usan formato argentino: el punto separa miles y la coma separa decimales. `15000`, `15.000`, `1500,50` y `1.500,50` son válidos; `1500.50` da error, igual que el texto sobrante (`12abc`) y más de 2 decimales. La cotización acepta hasta 6. Vale para `--monto`, `--exento`, `--nogravado`, `--cotizacion-moneda` y el monto de `--alicuota TASA:MONTO`. En el JSON de `--cargar` los montos son números, también con 2 decimales como máximo (la cotización, 6).
 
-Las fechas usan formato argentino (día primero), con mes y año opcionales. Detalle completo en [Fechas aceptadas](validation-rules.md#fechas-aceptadas).
+#### Las fechas de un comprobante
+
+Un comprobante puede llevar hasta cuatro fechas, y cada una responde a una pregunta distinta:
+
+| Fecha                    | Flag                                                 | Responde                       | Sin el flag                                     |
+| ------------------------ | ---------------------------------------------------- | ------------------------------ | ----------------------------------------------- |
+| Del comprobante          | `-f`, `--fecha`                                      | ¿Qué día se emite?             | hoy                                             |
+| Período del servicio     | `--sd`/`--servicio-desde`, `--sh`/`--servicio-hasta` | ¿Qué período cubre la factura? | la fecha del comprobante                        |
+| Vencimiento              | `--vto`, `--vencimiento`                             | ¿Cuándo vence el pago?         | el fin del servicio, o la fecha del comprobante |
+| Período asociado (notas) | `--pd`/`--periodo-desde`, `--ph`/`--periodo-hasta`   | ¿Qué facturas ajusta la nota?  | no va: se usa el comprobante asociado (`--ac`…) |
+
+- `--servicio-*` y `--vencimiento` son de facturas (y notas) de servicios. `--periodo-*` es solo de notas: en lugar de ajustar una factura puntual, ajustan todo lo facturado en ese período.
+- `--dia` está deprecado: usá `--vencimiento` o `--vto`.
+
+Ejemplos:
+
+```bash
+# Servicio de octubre, facturado hoy, que vence el 10/11
+arcli fc -m 1000 --cs --cfinal --ir-cf --sd 1/10 --sh 31/10 --vto 10/11
+
+# Nota de crédito por un descuento sobre todo lo facturado en octubre de 2026
+arcli ncc -m 500 --cs --cfinal --ir-cf --pd 1/10/2026 --ph 31/10/2026
+```
+
+Para facturar con otra fecha, sumá `-f`: por ejemplo, `-f 31/10` el 3/11 (en servicios, hasta 10 días antes o después de hoy).
+
+Las cuatro se escriben igual: formato argentino (día primero), con mes y año opcionales; sin año se toma la fecha más cercana a hoy. Detalle completo en [Fechas aceptadas](validation-rules.md#fechas-aceptadas).
 
 ### Asociados
 
@@ -339,7 +365,7 @@ Las facturas comparten la misma base.
 - fecha del comprobante: `--fecha`
 - moneda y cotización: `--moneda`, `--mda`, `--cotizacion-moneda`, `--cm`, `--misma-moneda`
 - carga JSON: `--cargar`
-- fechas de servicio: `--dia`, `--servicio-desde`, `--servicio-hasta`, `--vencimiento`
+- fechas de servicio y vencimiento: `--servicio-desde`, `--servicio-hasta`, `--vencimiento` (y `--dia`, deprecado)
 - modo de ejecución: `--previsualizar`, `--emitir`
 - salida: `--json`, `--bruto`
 
@@ -368,7 +394,7 @@ arcli fa -m 1 --cs --cuit 20168598204 --ir-ri
 | `--iva-receptor <tipo>` / `--ir <tipo>` / `--ir-*`                              | ninguno         | unión de IVA receptor o `boolean`                     | Sí          | Siempre, una sola forma de IVA receptor       |
 | `--punto-venta <numero>`                                                        | `--pv <numero>` | `integer`                                             | Condicional | Si no está en config                          |
 | `--fecha <fecha>`                                                               | `-f`            | `string`                                              | No          | Si querés fijar una fecha específica          |
-| `--dia <numero>`                                                                | `-d`            | `integer`                                             | Condicional | Si el concepto usa servicio                   |
+| `--dia <numero>`                                                                | `-d`            | `integer`                                             | No          | Deprecado: usá `--vencimiento` o `--vto`      |
 | `--servicio-desde <fecha>`                                                      | `--sd <fecha>`  | `string`                                              | Condicional | Si el concepto usa servicio                   |
 | `--servicio-hasta <fecha>`                                                      | `--sh <fecha>`  | `string`                                              | Condicional | Si el concepto usa servicio                   |
 | `--vencimiento <fecha>`                                                         | `--vto <fecha>` | `string`                                              | No          | Servicios y facturas FCE                      |
@@ -606,7 +632,7 @@ WSFEX no valida que `Imp_total` coincida con la suma de los items, así que ARCL
 
 Estos flags de facturación no existen en `fe`, que los rechaza como opción desconocida. `arcli factura e` comparte el comando con A, B y C, así que los acepta pero los saltea con un aviso en "Avisos" (y en `avisos` del JSON); lo mismo pasa al revés con los flags de la `E` en `arcli factura a`, `b` o `c`:
 
-- concepto (`--concepto`, `--cs`, `--cp`, `--csp`) y fechas de servicio (`--dia`, `--servicio-desde`, `--servicio-hasta`, `--vencimiento`)
+- concepto (`--concepto`, `--cs`, `--cp`, `--csp`) y fechas de servicio (`--servicio-desde`, `--servicio-hasta`, `--vencimiento` y `--dia`, deprecado)
 - identidad del receptor (`--cuit`, `--cuil`, `--dni`, `--consumidor-final`) e `--iva-receptor`
 - IVA y alícuotas (`--alicuota`, `--exento`, `--nogravado`, `--alicuotas`)
 - comprobante asociado (`--ac`, `--at`, `--apv`, `--ar`, `--acuit`, `--afecha`, `--anulacion`, `--periodo-desde`, `--periodo-hasta`)
