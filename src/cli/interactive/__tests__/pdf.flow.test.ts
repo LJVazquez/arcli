@@ -8,10 +8,12 @@ import { writeTerminalOutput } from '../../../ui';
 import { writePdfOutcomes } from '../../commands/billing.command.output';
 import { attachPdfs } from '../../commands/billing.command.pdf';
 import { offerPdf } from '../pdf.flow';
-import { askText, confirm } from '../prompts';
+import { askText, chooseOne, confirm } from '../prompts';
 
 vi.mock('../prompts', () => ({
   askText: vi.fn(),
+  // Sin respuesta preparada, Enter: el valor marcado, o la primera opcion (Omitir).
+  chooseOne: vi.fn(async (_message, choices, defaultValue) => defaultValue ?? choices[0].value),
   confirm: vi.fn(),
   isPromptCancellation: (error: unknown) => error instanceof Error && error.name === 'ExitPromptError',
 }));
@@ -32,6 +34,7 @@ vi.mock('../../../modules/config/config.service', () => ({
 }));
 
 const askTextMock = vi.mocked(askText);
+const chooseOneMock = vi.mocked(chooseOne);
 const confirmMock = vi.mocked(confirm);
 const attachPdfsMock = vi.mocked(attachPdfs);
 
@@ -108,6 +111,7 @@ describe('offerPdf', () => {
 
   it('asks the PDF-only data and generates it', async () => {
     confirmMock.mockResolvedValueOnce(true);
+    chooseOneMock.mockResolvedValueOnce('otros-medios-electronicos');
     askTextMock
       .mockResolvedValueOnce('Servicios de octubre')
       .mockResolvedValueOnce('Cliente SA')
@@ -123,12 +127,92 @@ describe('offerPdf', () => {
           pdfDescription: 'Servicios de octubre',
           receiverAddress: undefined,
           receiverName: 'Cliente SA',
+          saleCondition: 'otros-medios-electronicos',
         }),
       ],
       interactive: true,
       results: [result],
     });
     expect(writePdfOutcomes).toHaveBeenCalled();
+    expect(chooseOneMock).toHaveBeenCalledWith(
+      'Condición de venta:',
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'Omitir' }),
+        expect.objectContaining({ name: 'Tarjeta de Débito', value: 'tarjeta-debito' }),
+        expect.objectContaining({ name: 'Otra', value: 'otra' }),
+      ]),
+      undefined,
+    );
+  });
+
+  it('marks the sale condition of the config, so Enter keeps it', async () => {
+    confirmMock.mockResolvedValueOnce(true);
+    askTextMock.mockResolvedValue('');
+
+    await offerPdf({ ...CONFIG, condicionVenta: 'cuenta-corriente' }, input, result);
+
+    expect(chooseOneMock).toHaveBeenCalledWith('Condición de venta:', expect.any(Array), 'cuenta-corriente');
+    expect(attachPdfsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({ condicionVenta: 'cuenta-corriente' }),
+        inputs: [expect.objectContaining({ saleCondition: 'cuenta-corriente' })],
+      }),
+    );
+    askTextMock.mockReset();
+  });
+
+  it('omits the sale condition even if the config has one', async () => {
+    confirmMock.mockResolvedValueOnce(true);
+    askTextMock.mockResolvedValue('');
+    chooseOneMock.mockResolvedValueOnce('omitir');
+
+    await offerPdf({ ...CONFIG, condicionVenta: 'contado' }, input, result);
+
+    expect(attachPdfsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({ condicionVenta: 'contado' }),
+        inputs: [expect.objectContaining({ saleCondition: null })],
+      }),
+    );
+    askTextMock.mockReset();
+  });
+
+  it('only asks for free text with Otra: Enter keeps "Otra" and a typed text is used as is', async () => {
+    confirmMock.mockResolvedValue(true);
+    askTextMock.mockImplementation(async (message, options) =>
+      message === 'Condición de venta:' ? (options?.defaultValue ?? '') : '',
+    );
+    chooseOneMock.mockResolvedValueOnce('otra');
+
+    await offerPdf(CONFIG, input, result);
+
+    expect(attachPdfsMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ inputs: [expect.objectContaining({ saleCondition: 'Otra' })] }),
+    );
+
+    askTextMock.mockImplementation(async (message) => (message === 'Condición de venta:' ? 'Billetera virtual' : ''));
+    chooseOneMock.mockResolvedValueOnce('otra');
+
+    await offerPdf(CONFIG, input, result);
+
+    expect(attachPdfsMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ inputs: [expect.objectContaining({ saleCondition: 'Billetera virtual' })] }),
+    );
+    askTextMock.mockReset();
+    confirmMock.mockReset();
+  });
+
+  it('marks Otra with the free text of the config, so Enter keeps it', async () => {
+    confirmMock.mockResolvedValueOnce(true);
+    askTextMock.mockImplementation(async (_message, options) => options?.defaultValue ?? '');
+
+    await offerPdf({ ...CONFIG, condicionVenta: 'Billetera virtual' }, input, result);
+
+    expect(chooseOneMock).toHaveBeenCalledWith('Condición de venta:', expect.any(Array), 'otra');
+    expect(attachPdfsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ inputs: [expect.objectContaining({ saleCondition: 'Billetera virtual' })] }),
+    );
+    askTextMock.mockReset();
   });
 
   it('asks the missing issuer data once and saves it when the user agrees', async () => {

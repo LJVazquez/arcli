@@ -99,6 +99,12 @@ export function registerBillingOptions(command: Command): void {
     .option('--pdf', 'alias de --exportar-pdf')
     .option('--sin-pdf', 'no generar el PDF, aunque la config diga otra cosa')
     .option('--descripcion <texto>', 'detalle del comprobante en el PDF; por defecto "Según detalle"')
+    .option(
+      '--condicion-venta <tipo>',
+      'condición de venta en el PDF: contado, tarjeta-debito, tarjeta-credito, cuenta-corriente, cheque, transferencia, otros-medios-electronicos, otra o un texto (alias: --cv)',
+    )
+    .option('--cv <tipo>', 'alias de --condicion-venta')
+    .option('--sin-condicion-venta', 'omite la condición de venta aunque esté configurada')
     .option('--receptor-nombre <texto>', 'nombre o razón social del receptor en el PDF')
     .option('--receptor-domicilio <texto>', 'domicilio del receptor en el PDF')
     .option('--previsualizar', 'mostrar el payload antes de emitir en ARCA')
@@ -110,6 +116,7 @@ const ALIAS_FLAGS = new Set([
   '--asociado-punto-venta',
   '--cfinal',
   '--cm',
+  '--cv',
   '--ir',
   '--mda',
   '--pd',

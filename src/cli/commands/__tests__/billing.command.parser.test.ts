@@ -669,6 +669,33 @@ describe('billing.command.parser', () => {
   describe('PDF flags', () => {
     const defaults = { defaultConcept: 'servicios' as const, defaultIvaCondition: 'consumidor-final' as const };
 
+    it('reads, overrides and explicitly omits the sale condition', () => {
+      const parse = (args: string[]) =>
+        parseBillingCommandInput(createCommand(['--monto', '1000', ...args]), 'fc', defaults);
+
+      expect(parse(['--cv', 'contado']).saleCondition).toBe('contado');
+      expect(parse(['--cargar', writeJsonInput({ condicionVenta: 'cheque' })]).saleCondition).toBe('cheque');
+      expect(parse(['--cargar', writeJsonInput({ condicionVenta: null })]).saleCondition).toBeNull();
+      expect(parse(['--cargar', writeJsonInput({ condicionVenta: null }), '--cv', 'cheque']).saleCondition).toBe(
+        'cheque',
+      );
+      expect(parse(['--sin-condicion-venta']).saleCondition).toBeNull();
+      expect(
+        parse(['--cargar', writeJsonInput({ condicionVenta: 'cheque' }), '--sin-condicion-venta']).saleCondition,
+      ).toBeNull();
+      expect(parse([]).saleCondition).toBeUndefined();
+    });
+
+    it('rejects a sale condition together with --sin-condicion-venta', () => {
+      expect(() =>
+        parseBillingCommandInput(
+          createCommand(['--monto', '1000', '--cv', 'contado', '--sin-condicion-venta']),
+          'fc',
+          defaults,
+        ),
+      ).toThrow(/--condicion-venta\/--cv o --sin-condicion-venta/);
+    });
+
     it('reads --exportar-pdf, its alias and the PDF-only data', () => {
       const input = parseBillingCommandInput(
         createCommand([
@@ -677,6 +704,8 @@ describe('billing.command.parser', () => {
           '--exportar-pdf',
           '--descripcion',
           'Servicios de octubre',
+          '--condicion-venta',
+          'Otros medios de pago electrónico',
           '--receptor-nombre',
           'Cliente SA',
           '--receptor-domicilio',
@@ -691,6 +720,7 @@ describe('billing.command.parser', () => {
         pdfDescription: 'Servicios de octubre',
         receiverAddress: 'Calle 1',
         receiverName: 'Cliente SA',
+        saleCondition: 'Otros medios de pago electrónico',
       });
       expect(parseBillingCommandInput(createCommand(['--monto', '1000', '--pdf']), 'fc', defaults).pdf).toBe(true);
       expect(parseBillingCommandInput(createCommand(['--monto', '1000', '--sin-pdf']), 'fc', defaults).pdf).toBe(false);

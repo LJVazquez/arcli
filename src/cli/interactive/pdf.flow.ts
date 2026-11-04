@@ -1,5 +1,10 @@
 import type { BillingCommandInput } from '../../modules/billing/billing.schemas';
 import type { BillingExecutionResult } from '../../modules/billing/billing.types.internal';
+import {
+  SALE_CONDITION_KEYS,
+  SALE_CONDITION_LABELS,
+  type SaleConditionKey,
+} from '../../modules/billing/sale-condition';
 import type { ArcliConfig } from '../../modules/config/config.schemas';
 import { ConfigService } from '../../modules/config/config.service';
 import { parseConfigValue } from '../../modules/config/config-value-parser';
@@ -9,7 +14,7 @@ import { noticePanel, writeTerminalOutput } from '../../ui';
 import { writePdfOutcomes } from '../commands/billing.command.output';
 import { attachPdfs } from '../commands/billing.command.pdf';
 
-import { askText, confirm, isPromptCancellation } from './prompts';
+import { askText, chooseOne, confirm, isPromptCancellation } from './prompts';
 
 type IssuerKey = 'cuit' | 'emisor.domicilio' | 'emisor.inicioActividades' | 'emisor.razonSocial';
 
@@ -19,6 +24,37 @@ const ISSUER_QUESTIONS: Record<IssuerKey, string> = {
   'emisor.inicioActividades': 'Fecha de inicio de actividades (D/MM/YYYY)',
   'emisor.razonSocial': 'Razón social o nombre del emisor',
 };
+
+const OMIT_SALE_CONDITION = 'omitir';
+
+/**
+ * La condicion de venta del PDF, con la de siempre (la del comprobante o la de la config) ya marcada: Enter la
+ * mantiene. "Otra" pide el texto; Enter deja "Otra", o el texto libre que ya habia.
+ */
+async function askSaleCondition(current: string | undefined): Promise<string | null> {
+  const currentKey = current?.trim().toLowerCase();
+  const isKey = (value: string | undefined): value is SaleConditionKey =>
+    SALE_CONDITION_KEYS.includes(value as SaleConditionKey);
+  const currentText = current?.trim() && !isKey(currentKey) ? current.trim() : undefined;
+  const choice = await chooseOne<SaleConditionKey | typeof OMIT_SALE_CONDITION>(
+    'Condición de venta:',
+    [
+      { name: 'Omitir', value: OMIT_SALE_CONDITION },
+      ...SALE_CONDITION_KEYS.map((key) => ({ name: SALE_CONDITION_LABELS[key], value: key })),
+    ],
+    isKey(currentKey) ? currentKey : currentText ? 'otra' : undefined,
+  );
+
+  if (choice === OMIT_SALE_CONDITION) {
+    return null;
+  }
+
+  if (choice !== 'otra') {
+    return choice;
+  }
+
+  return (await askText('Condición de venta:', { defaultValue: currentText ?? SALE_CONDITION_LABELS.otra })) || 'otra';
+}
 
 function validateConfigValue(key: IssuerKey, value: string): string | true {
   try {
@@ -112,6 +148,9 @@ export async function offerPdf(
       input.receiverAddress ? 'Domicilio del receptor:' : 'Domicilio del receptor (Enter para omitir)',
       { defaultValue: input.receiverAddress },
     );
+    const currentSaleCondition =
+      input.saleCondition === null ? undefined : (input.saleCondition ?? config.condicionVenta);
+    const saleCondition = await askSaleCondition(currentSaleCondition);
     const completedConfig = await completeIssuer(config);
     const withPdf = await attachPdfs({
       config: completedConfig,
@@ -122,6 +161,7 @@ export async function offerPdf(
           pdfDescription: description || undefined,
           receiverAddress: receiverAddress || undefined,
           receiverName: receiverName || undefined,
+          saleCondition,
         },
       ],
       interactive: true,

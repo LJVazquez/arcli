@@ -149,6 +149,7 @@ describe('mapBillingResultToPdfData', () => {
 
   it('maps a factura C to a single line with the total', () => {
     const data = mapBillingResultToPdfData(createResult('fc', { ImpNeto: 150000, ImpTotal: 150000 }), issuer, {
+      condicionVenta: 'Otros medios de pago electrónico',
       descripcion: 'Servicios de septiembre',
     });
 
@@ -157,6 +158,7 @@ describe('mapBillingResultToPdfData', () => {
       cbteDesde: 125,
       cbteLetra: 'C',
       cbteTipo: 11,
+      condicionVenta: 'Otros medios de pago electrónico',
       importeIva: 0,
       importeNetoGravado: 150000,
       importeTotal: 150000,
@@ -172,6 +174,18 @@ describe('mapBillingResultToPdfData', () => {
 
     expect(data).toMatchObject({ cbteDescripcion: 'RECIBO', cbteLetra: 'C', cbteTipo: 15, importeIva: 0 });
     expect(data.iva).toBeUndefined();
+  });
+
+  it('prints a known sale condition by its name, and a free text as is', () => {
+    const fc = createResult('fc', { ImpNeto: 1000, ImpTotal: 1000 });
+
+    expect(mapBillingResultToPdfData(fc, issuer, { condicionVenta: 'cuenta-corriente' }).condicionVenta).toBe(
+      'Cuenta Corriente',
+    );
+    expect(mapBillingResultToPdfData(fc, issuer, { condicionVenta: 'Billetera virtual' }).condicionVenta).toBe(
+      'Billetera virtual',
+    );
+    expect(mapBillingResultToPdfData(fc, issuer).condicionVenta).toBeUndefined();
   });
 
   it('maps one line per IVA rate plus exempt in a factura A', () => {
