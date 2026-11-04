@@ -8,6 +8,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+### Agregado
+
+- **Recibo C (`rc`, `arcli recibo c`):** emite o previsualiza un Recibo C (tipo ARCA 15) con los mismos flags y validaciones que la Factura C. La familia `recibo` solo tiene la letra C: `arcli recibo a` da error y el autocompletado ofrece solo `c`. Las notas de crédito y débito C pueden asociarse a un Recibo C (`arcli ncc --ac rc ...`). En el modo interactivo tiene su propia opción, **Emitir recibo**, y se puede elegir como comprobante original de una nota. "Repetir una factura anterior" pasa a llamarse **Repetir un comprobante anterior** y deja elegir entre una factura y un recibo. El PDF lleva el título `RECIBO C`, `COD.15` y el QR de ARCA con el tipo 15, y se guarda como `recibo-c_<pv>-<numero>.pdf`. Gracias a [Guillermo Britos](https://github.com/guillermobr), que lo trajo en [#78](https://github.com/LcsGrz/arcli/pull/78).
+
 ### Cambiado
 
 - **Rutas clickeables:** en terminales que soportan links (VS Code, iTerm2, Windows Terminal, Kitty, WezTerm, Ghostty), las rutas de `arcli config`, `arcli pdf`, el PDF guardado y `arcli certificado` se abren con un clic. `FORCE_HYPERLINK=0` los apaga. `arcli config` muestra además la carpeta de certificados.
