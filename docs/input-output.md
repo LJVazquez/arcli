@@ -25,7 +25,7 @@ arcli fc --cargar ./voucher.json
 | `cbu`                 | string         | en facturas FCE, salvo `config.cbu`    | CBU del emisor (facturas FCE)                                                                                                                   |
 | `comprobanteAsociado` | object         | no                                     | Comprobante asociado                                                                                                                            |
 | `concepto`            | string         | sí, salvo default por flags/config     | Concepto                                                                                                                                        |
-| `codigoMoneda`        | string         | no                                     | Moneda                                                                                                                                          |
+| `codigoMoneda`        | string         | no                                     | Moneda: código ISO (`ARS`, `USD`, `UYU`…) o de ARCA (`PES`, `DOL`, `011`…)                                                                      |
 | `cotizacionMoneda`    | number         | en moneda extranjera sin `mismaMoneda` | Cotización de la moneda                                                                                                                         |
 | `mismaMoneda`         | boolean        | no                                     | El pago se cancela en la moneda extranjera                                                                                                      |
 | `dia`                 | number         | no                                     | Deprecado: usá `vencimientoPago`. Vence el próximo día con ese número                                                                           |
@@ -792,7 +792,7 @@ Dos comandos de diagnóstico informan un problema sin que sea un error: `arcli c
 | `CONFIGURATION_ERROR`              | todos los que usan ARCA, `config`                               | Falta o es inválido un dato de la config: CUIT, certificado, clave, `config.json` corrupto                      | `arcli config revisar` y `arcli config establecer`                                                                                       |
 | `BATCH_VALIDATION_ERROR`           | facturación con lote                                            | Algún comprobante del lote es inválido; no se emitió ninguno                                                    | Corregí los índices de `detalles.comprobantes` y corré el lote completo ([detalle](#validación-y-errores-del-lote))                      |
 | `BATCH_EMISSION_ERROR`             | facturación con lote                                            | El lote se cortó a mitad; los procesados salen antes por stdout                                                 | No reemitas los procesados; verificá `detalles.sinConfirmar` con `arcli ultimos` y reintentá `detalles.sinProcesar`                      |
-| `EMISSION_UNCERTAIN`               | facturación A, B y C (no `fe`)                                  | Falló la llamada que emite: puede haberse emitido igual                                                         | Verificá con el `arcli ultimos` de `sugerencia` antes de reintentar ([detalle](#emisión-sin-confirmar))                                  |
+| `EMISSION_UNCERTAIN`               | facturación                                                     | Falló la llamada que emite: puede haberse emitido igual                                                         | Seguí la `sugerencia` antes de reintentar ([detalle](#emisión-sin-confirmar))                                                            |
 | `TRANSIENT_ERROR`                  | todos los que usan ARCA                                         | WSAA o ARCA informan un estado pasajero (ticket vigente, transacción activa)                                    | Esperá unos segundos y reintentá sin cambiar nada                                                                                        |
 | `UNEXPECTED_ERROR`                 | todos                                                           | Error sin código propio: red, login en WSAA (certificado vencido o no autorizado), respuesta inesperada de ARCA | Leé `error`; si es de red o de ARCA, reintentá más tarde                                                                                 |
 | `ARCA_UNAVAILABLE`                 | `estado`                                                        | ARCA no respondió a la consulta de estado                                                                       | Reintentá en unos minutos; si persiste, ARCA está caído                                                                                  |
@@ -878,13 +878,13 @@ Con el certificado del entorno vencido, los comandos que van a ARCA cortan antes
   "codigo": "CERTIFICATE_EXPIRED",
   "detalles": { "entorno": "produccion", "vencimiento": "20/11/2026" },
   "error": "El certificado de producción venció el 20/11/2026: ARCA no lo acepta.",
-  "sugerencia": "Generá uno nuevo siguiendo la guía y cargalo con \"arcli config establecer cert.produccion <ruta>\": https://github.com/LcsGrz/arcli/blob/main/docs/obtencion-certificados.md"
+  "sugerencia": "Renovalo con \"arcli certificado generar --produccion\" y cargá el .crt de ARCA con \"arcli certificado importar <archivo>\". Guía: https://github.com/LcsGrz/arcli/blob/main/docs/obtencion-certificados.md"
 }
 ```
 
 ### Emisión sin confirmar
 
-Si falla la llamada que emite en ARCA (red, timeout, transacción activa), no se sabe si el comprobante quedó autorizado: pudo emitirse y perderse la respuesta. **No reintentes sin verificar**, porque se duplicaría. Por ahora vale para A, B y C: un fallo al emitir `fe` sale como error común.
+Si falla la llamada que emite en ARCA (red, timeout, transacción activa), no se sabe si el comprobante quedó autorizado: pudo emitirse y perderse la respuesta. **No reintentes sin verificar**, porque se duplicaría.
 
 Los pasos previos no cuentan: si falla el login en WSAA (por ejemplo, un certificado no autorizado; uno vencido corta antes, con [`CERTIFICATE_EXPIRED`](#certificado-vencido)) o el pedido del último número, no se envió nada y el error sale como `UNEXPECTED_ERROR` o `TRANSIENT_ERROR`.
 
@@ -893,7 +893,18 @@ Los pasos previos no cuentan: si falla el login en WSAA (por ejemplo, un certifi
   "codigo": "EMISSION_UNCERTAIN",
   "detalles": { "causa": "socket hang up" },
   "error": "No se pudo confirmar la emisión: socket hang up",
-  "sugerencia": "Puede haberse emitido igual. Antes de reintentar, verificá con \"arcli ultimos fc --pv 3\": si figura, ya esta emitido y no hay que repetirlo."
+  "sugerencia": "Puede haberse emitido igual. Antes de reintentar, verificá con \"arcli ultimos fc --pv 3\": si figura, ya está emitido y no hay que repetirlo."
+}
+```
+
+En la factura E (`fe`) el número lo pasás vos con `--numero`, y ARCA no autoriza dos comprobantes con el mismo número. Por eso la `sugerencia` no manda a verificar con `arcli ultimos` (que no acepta `fe`) sino a reintentar con los mismos `--numero` e `--id-solicitud`, que también vienen en `detalles`:
+
+```json
+{
+  "codigo": "EMISSION_UNCERTAIN",
+  "detalles": { "causa": "socket hang up", "idSolicitud": 42, "numero": 7 },
+  "error": "No se pudo confirmar la emisión: socket hang up",
+  "sugerencia": "Puede haberse emitido igual. Si reintentás, usá el mismo número y la misma solicitud (--numero 7 --id-solicitud 42 --pv 3): si ya se había emitido, ARCA no lo autoriza dos veces."
 }
 ```
 
@@ -906,7 +917,7 @@ En un lote, el mismo caso sale como `BATCH_EMISSION_ERROR` con `detalles.sinConf
   "codigo": "TRANSIENT_ERROR",
   "detalles": null,
   "error": "ns1:coe.alreadyAuthenticated",
-  "sugerencia": "WSAA informo que ya existe un TA válido para este servicio. Esperá unos segundos y volvé a intentar sin cambiar el payload."
+  "sugerencia": "WSAA informó que ya existe un TA válido para este servicio. Esperá unos segundos y volvé a intentar sin cambiar el payload."
 }
 ```
 
