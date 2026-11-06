@@ -41,7 +41,7 @@ export interface ExportRuntime {
 /** Se valida antes de tocar la red: un flag que falta no tiene por que autenticar en WSAA. */
 function assertRequiredFields(input: ExportVoucherInput, activity: number | undefined): void {
   if (typeof input.amount !== 'number' || !(input.amount > 0)) {
-    throw new InputValidationError('Falta el importe total o no es válido. Usá --monto.');
+    throw new InputValidationError('Falta el monto total o no es válido. Usá --monto.');
   }
 
   if (!input.clientName?.trim()) {
@@ -66,7 +66,7 @@ function assertRequiredFields(input: ExportVoucherInput, activity: number | unde
 
   if (activity === undefined) {
     throw new InputValidationError(
-      'Falta la actividad de exportación. Usá --actividad o guardala con "arcli config establecer exportacion.actividad <código>": es el código de la tabla de actividades de WSFEX, por ejemplo 620100.',
+      'Falta la actividad de exportación. Usá --actividad o guardala con `arcli config establecer exportacion.actividad <código>`: es el código de la tabla de actividades de WSFEX, por ejemplo 620100.',
     );
   }
 
