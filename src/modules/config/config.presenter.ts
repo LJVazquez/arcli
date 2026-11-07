@@ -2,9 +2,16 @@ import { formatArcaDateAsArgentineDate } from '../../lib/dates/arca-date';
 import { formatCuit } from '../../lib/identity/format-cuit';
 import { formatExchangeRate } from '../../lib/numbers/argentine-amount';
 import { maskPath } from '../../lib/paths/mask-path';
-import { keyValuePanel, statusPanel } from '../../ui/components';
-import { bold, colorize, pathLink, resolveKeyValueLabelWidth, toneText, uiSymbol } from '../../ui/primitives';
-import { UI_THEME } from '../../ui/theme';
+import { checklistPanel, sheetPanel } from '../../ui/components';
+import {
+  bold,
+  colorize,
+  pathLink,
+  renderKeyValueRows,
+  resolveKeyValueLabelWidth,
+  toneText,
+  uiSymbol,
+} from '../../ui/primitives';
 import { RECENT_VOUCHERS_LIMIT } from '../vouchers/voucher-history';
 
 import type { ArcliConfig, ConfigPublicKey } from './config.schemas';
@@ -217,20 +224,18 @@ export function formatConfigAsText(config: ArcliConfig, paths: ConfigPathSnapsho
   const labelWidth = resolveKeyValueLabelWidth(
     'standard',
     sections.flatMap((section) => section.rows),
-    [35, 65],
   );
-  const gap = ' '.repeat(UI_THEME.table.gap);
   const lines = sections.flatMap((section, index) => [
     ...(index > 0 ? [''] : []),
     colorize(section.label, 'info'),
     // Los datos van corridos bajo el titulo, asi la seccion se lee aun sin color (NO_COLOR, pipes).
-    ...section.rows.map(
-      ([label, value]) =>
-        `  ${colorize(label.padEnd(labelWidth), 'muted')}${gap}${value === NOT_SET ? colorize(value, 'muted') : value}`,
+    ...renderKeyValueRows(
+      section.rows.map(([label, value]) => [label, value === NOT_SET ? colorize(value, 'muted') : value] as const),
+      { indent: 2, labelTone: 'muted', labelWidth },
     ),
   ]);
 
-  return keyValuePanel('Configuración', lines, undefined, 'standard', undefined, 'sheet');
+  return sheetPanel('Configuración', lines);
 }
 
 export function formatConfigDoctor(report: ConfigDoctorReport): string {
@@ -302,5 +307,5 @@ export function formatConfigDoctorAsText(report: ConfigDoctorReport): string {
       ? 'Hay puntos críticos por corregir antes de emitir'
       : 'Revisá las recomendaciones antes de emitir en serio';
 
-  return statusPanel('Revisión de configuración', lines, footer, 'wide', tone, 'checklist');
+  return checklistPanel('Revisión de configuración', lines, { footer, tone });
 }

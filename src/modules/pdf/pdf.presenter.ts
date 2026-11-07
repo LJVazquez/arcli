@@ -1,4 +1,4 @@
-import { errorPanel, keyValuePanel, noticePanel } from '../../ui/components';
+import { errorPanel, noticePanel, sheetPanel } from '../../ui/components';
 import { pathLink, renderKeyValueRows, resolveKeyValueLabelWidth, supportsHyperlinks } from '../../ui/primitives';
 
 import type { PdfOutcome } from './pdf.types';
@@ -64,12 +64,8 @@ export function formatPdfPluginStatusAsText(status: PdfPluginStatusView, title =
   ];
   const footer = status.installed ? 'Listo para generar PDFs' : 'Instalalo con `arcli pdf instalar`.';
 
-  return keyValuePanel(
-    title,
-    renderKeyValueRows(rows, { labelWidth: resolveKeyValueLabelWidth('standard', rows, [25, 75]) }),
+  return sheetPanel(title, renderKeyValueRows(rows, { labelWidth: resolveKeyValueLabelWidth('standard', rows) }), {
     footer,
-    'standard',
-    status.installed ? 'success' : 'warning',
-    'sheet',
-  );
+    tone: status.installed ? 'success' : 'warning',
+  });
 }

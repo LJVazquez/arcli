@@ -2,12 +2,16 @@ import { ConfigurationError, InputValidationError } from '../../lib/errors/app-e
 import { CERTIFICATE_GUIDE_URL } from '../../lib/links';
 import type { ArcaRuntimeValidation } from '../../services/arca/arca-context.resolver';
 import {
+  attentionPanel,
   certificateBanner,
-  contentPanel,
+  dataPanel,
+  errorListPanel,
   sectionHeading,
+  sheetPanel,
   statusBar,
-  statusPanel,
   testingBanner,
+  ticketPanel,
+  tipPanel,
 } from '../../ui/components';
 import { formatAppError } from '../../ui/presenters';
 import {
@@ -20,13 +24,18 @@ import {
   renderPanel,
   resolveKeyValueLabelWidth,
   toneText,
+  uiSymbol,
   type UiTextColor,
 } from '../../ui/primitives';
 import { type UiBorderType } from '../../ui/theme';
 import { formatBillingResultAsJson, formatBillingResultAsText } from '../billing/billing.presenter';
 import type { VoucherKindDefinition } from '../billing/billing.types';
 import type { BillingExecutionResult } from '../billing/billing.types.internal';
-import { formatCertificateStatusAsText, formatGeneratedRequestAsText } from '../certificates/certificate.presenter';
+import {
+  formatCertificateStatusAsText,
+  formatGeneratedRequestAsText,
+  formatImportedCertificateAsText,
+} from '../certificates/certificate.presenter';
 import {
   formatConfig,
   formatConfigAsText,
@@ -38,7 +47,7 @@ import { buildConfigDoctorReport } from '../config/config-doctor';
 import { formatPadronAsText } from '../padron/padron.presenter';
 import { formatParameterTablesAsText, formatStatusAsText } from '../parameters/parameters.presenter';
 import { formatPdfPluginStatusAsText } from '../pdf/pdf.presenter';
-import { renderUpdateNoticePanel } from '../update-check/update-check.presenter';
+import { renderUpdateDetails, renderUpdateNoticePanel } from '../update-check/update-check.presenter';
 import type { UpdateCheckResult } from '../update-check/update-check.service';
 import type { IssuedVoucher } from '../vouchers/voucher-history';
 import { formatVoucherDetailAsText, formatVoucherListAsText } from '../vouchers/voucher-history.presenter';
@@ -434,7 +443,7 @@ function buildCertificatesScene(): string {
   const now = new Date('2026-03-26T12:00:00-03:00');
 
   return [
-    sceneTitle('Certificados', 'Estado por entorno y pedido nuevo'),
+    sceneTitle('Certificados', 'Estado por entorno, pedido nuevo y certificado importado'),
     formatCertificateStatusAsText(
       [
         {
@@ -456,6 +465,15 @@ function buildCertificatesScene(): string {
       environment: 'testing',
       keyPath: '/ruta/a/testing.key',
       requestPath: '/ruta/a/testing.csr',
+    }),
+    formatImportedCertificateAsText({
+      alias: 'arcli',
+      certificatePath: '/ruta/a/testing.crt',
+      cuit: '20333333334',
+      environment: 'testing',
+      expiresAt: new Date('2028-03-26T12:00:00-03:00'),
+      keyPath: '/ruta/a/testing.key',
+      replaced: true,
     }),
   ].join('\n\n');
 }
@@ -488,9 +506,9 @@ function buildJsonScene(): string {
 
   return [
     sceneTitle('Json', 'Contratos estructurados para automatización y respuesta bruta'),
-    contentPanel('Billing json', billingJson, 'wide', 'subtle', 'left', 'data'),
-    contentPanel('Config json', configJson, 'wide', 'subtle', 'left', 'data'),
-    contentPanel('Doctor json', doctorJson, 'wide', 'subtle', 'left', 'data'),
+    dataPanel('Billing json', billingJson),
+    dataPanel('Config json', configJson),
+    dataPanel('Doctor json', doctorJson),
   ].join('\n\n');
 }
 
@@ -507,70 +525,57 @@ function buildComponentsScene(): string {
     summary: 'El certificado de producción venció el 20/11/2026.',
   });
   const updateNotice = renderUpdateNoticePanel(createSampleUpdateCheckResult());
-  const keyValueRows: Array<readonly [string, string | number]> = [
+  const updateDetails = renderUpdateDetails(createSampleUpdateCheckResult(), [
+    {
+      changes: [
+        { kind: 'agregado', nested: false, text: 'Acceso directo en el escritorio.', topic: 'Modo interactivo' },
+        { kind: 'cambiado', nested: false, text: 'Opciones entre backticks en los mensajes.' },
+        { kind: 'corregido', nested: false, text: '"Volver" es un botón común en la selección múltiple.' },
+      ],
+      date: '2026-11-07',
+      version: '0.2.0',
+    },
+  ]);
+  const sheetRows: Array<readonly [string, string | number]> = [
     ['CUIT', '20-33333333-4'],
     ['Punto de venta', 3],
     ['Entorno', 'testing'],
   ];
-  const statusRows: Array<readonly [string, string | number]> = [
+  const ticketRows: Array<readonly [string, string | number]> = [
     ['CAE', '86120020280000'],
     ['Importe total', '$ 1'],
-    ['Errores', 0],
   ];
-  const demoLabelWidth = resolveKeyValueLabelWidth('compact', [...keyValueRows, ...statusRows]);
-  const keyValue = renderPanel({
-    content: renderKeyValueRows(keyValueRows, { labelWidth: demoLabelWidth }),
-    contentAlign: 'left',
-    footer: toneText('TODO LISTO', 'success'),
-    footerColor: 'success',
-    footerDivider: true,
-    padding: {
-      bottom: 1,
-      left: 2,
-      right: 2,
-      top: 1,
-    },
-    title: 'Demo key value',
-    width: 'compact',
-  });
-
-  const status = statusPanel(
-    'Demo estado',
-    [
-      ...renderKeyValueRows(statusRows.slice(0, 2), { labelWidth: demoLabelWidth }),
-      '',
-      ...renderKeyValueRows(statusRows.slice(2), { labelWidth: demoLabelWidth }),
-    ],
-    'APROBADO',
-    'compact',
-    'success',
-  );
-
-  const content = contentPanel(
-    'Demo contenido',
-    renderObject({
-      cae: '86120020280000',
-      resultado: 'A',
-      payload: { CbteTipo: 11, ImpTotal: 1, PtoVta: 3 },
-    }),
-    'wide',
-    'info',
-  );
 
   return [
-    sceneTitle('Componentes', 'Notice, badges y paneles base'),
+    sceneTitle('Componentes', 'Banners, avisos y un panel de cada rol'),
     notice,
     certificateNotice,
     expiredCertificateNotice,
     updateNotice,
-    keyValue,
-    status,
-    content,
+    updateDetails,
+    sheetPanel(
+      'Demo ficha',
+      renderKeyValueRows(sheetRows, { labelWidth: resolveKeyValueLabelWidth('standard', sheetRows) }),
+      { footer: toneText('TODO LISTO', 'success'), tone: 'success' },
+    ),
+    ticketPanel(
+      'Demo comprobante',
+      renderKeyValueRows(ticketRows, { labelWidth: resolveKeyValueLabelWidth('ticket', ticketRows) }),
+      { footer: toneText('APROBADO', 'success'), tone: 'success' },
+    ),
+    attentionPanel('Demo avisos', `${uiSymbol('bullet')} La cotización sale de ARCA.`),
+    tipPanel('Demo sugerencias', `${uiSymbol('bullet')} Revisá \`--fecha\`.`),
+    errorListPanel('Demo errores', '1. 10016: la fecha no corresponde.'),
+    dataPanel(
+      'Demo datos',
+      renderObject({ cae: '86120020280000', payload: { CbteTipo: 11, ImpTotal: 1, PtoVta: 3 }, resultado: 'A' }),
+    ),
   ].join('\n\n');
 }
 
-export function renderStorybookShowcase(scene?: StorybookScene): string {
-  const logo = renderLogo().trim();
+/** El storybook completo o una escena; `version`, la de arcli, va debajo del logo como en la ayuda. */
+export function renderStorybookShowcase(scene?: StorybookScene, version?: string): string {
+  const logo = renderLogo(version);
 
   const scenes: Record<StorybookScene, string> = {
     bordes: buildBordersScene(),
