@@ -424,7 +424,7 @@ describe('billing.service', () => {
         createBillingInput({ currencyCode: 'USD', documentNumber: 0, exchangeRate: 1 }),
         createRuntime(),
       ),
-    ).toThrow(/Falta la cotización de USD/);
+    ).toThrow(/La cotización de USD no puede ser 1/);
   });
 
   it('rejects an exchange rate other than 1 for pesos', () => {
@@ -1022,6 +1022,15 @@ describe('billing.service', () => {
       ).toThrow(/pero no ambos/);
     });
 
+    it('with a period and only part of an associated voucher, says not to mix them instead of asking for the voucher', () => {
+      expect(() =>
+        new BillingService().buildVoucherPayload(
+          periodNote({ associatedVoucher: { cuit: '20123456786' } }),
+          createRuntime(),
+        ),
+      ).toThrow(/pero no ambos/);
+    });
+
     it('rejects a period ending after the note date', () => {
       expect(() =>
         new BillingService().buildVoucherPayload(
@@ -1440,7 +1449,7 @@ describe('billing.service', () => {
     await expect(run).rejects.toThrow('No se pudo confirmar la emisión: socket hang up');
     await expect(run).rejects.toMatchObject({
       code: 'EMISSION_UNCERTAIN',
-      suggestion: expect.stringContaining('arcli ultimos fb --pv 3'),
+      suggestion: expect.stringContaining('arcli ultimos fb --pv 3 --testing'),
     });
   });
 

@@ -2,6 +2,7 @@ import { Separator } from '@inquirer/select';
 import { join } from 'node:path';
 
 import { AppError } from '../../lib/errors/app-error';
+import { normalizeDroppedPath } from '../../lib/paths/dropped-path';
 import {
   formatCompletionResultAsText,
   formatCompletionStateAsText,
@@ -124,7 +125,15 @@ async function askField(
   } else {
     // Con un valor actual, Enter lo deja igual (es el default del prompt); "-" lo borra.
     const canClear = !options.required && Boolean(current);
-    const hint = [field.hint, canClear ? '"-" para borrar' : undefined].filter(Boolean).join(', ');
+    // Un archivo arrastrado a la terminal llega entre comillas o con espacios escapados, como en Certificados.
+    const normalize = (text: string) => (field.path ? normalizeDroppedPath(text) : text);
+    const hint = [
+      field.hint,
+      field.path ? 'podés arrastrar el archivo' : undefined,
+      canClear ? '"-" para borrar' : undefined,
+    ]
+      .filter(Boolean)
+      .join(', ');
     const answer = await askTextStep(`${field.label}${hint ? ` (${hint})` : ''}:`, {
       defaultValue: current,
       validate: (text) => {
@@ -136,7 +145,7 @@ async function askField(
           return options.required ? 'Este dato es obligatorio.' : true;
         }
 
-        return validate(field.key, text);
+        return validate(field.key, normalize(text));
       },
     });
 
@@ -148,7 +157,7 @@ async function askField(
       return 'sin-cambios';
     }
 
-    value = canClear && answer.trim() === '-' ? CLEAR : answer;
+    value = canClear && answer.trim() === '-' ? CLEAR : normalize(answer);
   }
 
   if (value === CLEAR) {
@@ -188,6 +197,13 @@ async function askTestingCertificate(required: boolean): Promise<Back | GuidedSt
     }
 
     if (choice === 'sacar') {
+      writeTerminalOutput(
+        noticePanel(
+          `Vas a tener que entrar a la web de ARCA con tu Clave Fiscal. Podés cerrar ARCLI cuando quieras: el pedido queda guardado y lo retomás en Configuración ${uiSymbol('arrow')} Certificados de ARCA.`,
+          'info',
+        ),
+      );
+
       const result = await runGenerateCertificate('testing');
 
       return result === BACK ? BACK : { certificateFromArca: true };
@@ -239,7 +255,17 @@ export async function runGuidedSetup(): Promise<void> {
     await runWizard(fieldSteps(ISSUER_KEYS, []), {});
   }
 
-  writeTerminalOutput(noticePanel('Configuración guardada. Ya podés emitir en testing.', 'success'));
+  // Con "lo cargo después" el certificado queda pendiente: decir que ya se puede emitir seria falso.
+  const config = readConfig();
+
+  writeTerminalOutput(
+    !config.cert.testing || !config.key.testing
+      ? noticePanel(
+          `Configuración guardada, pero falta cargar el certificado de testing. Cuando lo bajes de ARCA, entrá a Configuración ${uiSymbol('arrow')} Certificados de ARCA ${uiSymbol('arrow')} Cargar el certificado (.crt).`,
+          'warning',
+        )
+      : noticePanel('Configuración guardada. Ya podés emitir en testing.', 'success'),
+  );
 }
 
 /** Los datos agrupados por seccion, en el mismo orden que `arcli config`, con un titulo arriba de cada una. */

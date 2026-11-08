@@ -84,7 +84,7 @@ const FIELD_DEFINITIONS: ReadonlyArray<Omit<ConfigField, 'label'>> = [
     read: (c) => c.exportacion?.actividad?.toString(),
   },
   {
-    hint: 'número',
+    hint: 'número; en testing sirve cualquiera, en producción tiene que ser uno de web service, no el de Factura en línea',
     key: 'puntoVenta',
     read: (c) => c.puntoVentaPorDefecto?.toString(),
   },
@@ -194,9 +194,13 @@ export function describeConfigValue(field: ConfigField, config: ArcliConfig): st
   return field.path ? maskPath(value) : (field.choiceLabels?.[value] ?? value);
 }
 
-/** Lo minimo para emitir: sin esto el modo interactivo no puede crear la sesion con ARCA. */
-const REQUIRED_SETUP_KEYS: readonly ConfigPublicKey[] = ['cuit', 'cert.testing', 'key.testing', 'puntoVenta'];
-
+/**
+ * Lo minimo para emitir: sin esto el modo interactivo no puede crear la sesion con ARCA. El certificado es el del
+ * entorno activo: quien emite solo en produccion no necesita el de testing.
+ */
 export function listMissingSetupKeys(config: ArcliConfig): ConfigPublicKey[] {
-  return REQUIRED_SETUP_KEYS.filter((key) => !getConfigField(key).read(config));
+  const environment = config.entornoPorDefecto;
+  const required: readonly ConfigPublicKey[] = ['cuit', `cert.${environment}`, `key.${environment}`, 'puntoVenta'];
+
+  return required.filter((key) => !getConfigField(key).read(config));
 }

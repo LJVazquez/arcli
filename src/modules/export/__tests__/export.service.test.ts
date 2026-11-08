@@ -241,6 +241,12 @@ describe('ExportService.resolve', () => {
     expect(gateway.getDestinationCountries).not.toHaveBeenCalled();
   });
 
+  it('rechaza un monto con más de 2 decimales, como A, B y C, en lugar de redondearlo', async () => {
+    await expect(
+      service.resolve({ ...INPUT, amount: 1500.005, items: undefined }, createGateway(), RUNTIME, NOW),
+    ).rejects.toThrow(/más de 2 decimales/);
+  });
+
   it('no consulta el ID de solicitud si el usuario lo informa', async () => {
     const gateway = createGateway();
     const resolved = await service.resolve({ ...INPUT, requestId: 100, voucherNumber: 5 }, gateway, RUNTIME, NOW);
@@ -345,7 +351,7 @@ describe('ExportService.preview y execute', () => {
       code: 'EMISSION_UNCERTAIN',
       details: { causa: 'socket hang up', idSolicitud, numero },
       message: 'No se pudo confirmar la emisión: socket hang up',
-      suggestion: expect.stringContaining(`--numero ${numero} --id-solicitud ${idSolicitud} --pv ${pv}`),
+      suggestion: expect.stringContaining(`--numero ${numero} --id-solicitud ${idSolicitud} --pv ${pv} --testing`),
     });
   });
 
